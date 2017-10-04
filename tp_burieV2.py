@@ -21,7 +21,7 @@ import random
 # ==============================
 def applicationOfFilter(img, folder):
 	# Get BDD 
-	bdd = makeBDD()
+	BDD = makeBDD()
 
 	# Ovrir image / mettre en noir et blanc / save
 	img = openImage(folder, img)
@@ -44,97 +44,82 @@ def applicationOfFilter(img, folder):
 
 	_, contours, _= cv2.findContours(dilated, val1, val2)
 
+	i = 0
 	# Pour chaque contour on les redessine sur l'image original
 	for contour in contours:
-		# On supprime les zones trop petites, pour eviter le bruit
-	    # if h<40 or w<40:
-	    #     continue
-	    [x,y,w,h] = cv2.boundingRect(contour)
+		[x,y,w,h] = cv2.boundingRect(contour)
+		# On supprime les zones trop grandes, pour eviter le bruit
+		if h>300 or w>300:
+			continue
+
 	    # cv2.rectangle(img,(x-2,y-2),(x+w-12,y+h-12),(0,0,255),1)
 
 	    # Crop image
+		imgCrop = img[y-2:y+h-12, x-2:x+w-12]
 
-	    # Analyse image 
-	    resultat = analyseImage(imgCrop) 
+		# Analyse image 
+		res = analyseImage(imgCrop, "test" + str(i))
+		# scipy.misc.imsave("test" + str(i) + ".png", imgCrop)
 
-	# plt.hist(img.ravel(),256,[0,256])
-	# plt.show()
-	# plt.imshow(im_med)
-	# plt.show()
+		# Compare
+		compare(res, BDD)
+		i = i+1
+
+		# plt.hist(img.ravel(),256,[0,256])
+		# plt.show()
+		# plt.imshow(im_med)
+		# plt.show()
 
 
 # ==============================
 # ========== ANALYSE ===========
 # ==============================
-def analyseImage(imgCrop):
+def analyseImage(imgCrop, name):
+	# Get pourcentage noir et blanc
+	imgNB = getNBImage(imgCrop)
+	hist = getHistGreyImage(imgNB)
+	percent = hist[0]/(hist[0]+hist[255])*100
 
-	# Get points d'intéret
-	return 0
+	# Initiate SIFT detector
+	sift = cv2.xfeatures2d.SIFT_create() 
+
+	# find the keypoints and descriptors with SIFT
+	kp1,des1 = sift.detectAndCompute(imgCrop,None)
+
+	distance = []
+	distance.append(name)
+	distance.append(percent[0])
+	distance.append(kp1)
+	distance.append(des1)
+	distance.append(imgCrop)
+
+	return distance
 
 
 # ==============================
 # ========== MAKE BDD ==========
 # ==============================
 def makeBDD():
-
 	# Ovrir image 
 	no = openImage(folder, "no.png")
-	no2 = openImage(folder, "no2.png")
 	a = openImage(folder, "a.png")
 	shi = openImage(folder, "shi.png")
 	tsu = openImage(folder, "tsu.png")
 	nu = openImage(folder, "nu.png")
 
-	# Image noir et blanc
-	no = getNBImage(no)
-	no2 = getNBImage(no2)
-	a = getNBImage(a)
-	shi = getNBImage(shi)
-	tsu = getNBImage(tsu)
-	nu = getNBImage(nu)
+	caract = {}
+	caract["no"] = no
+	caract["a"] = a
+	caract["tsu"] = tsu
+	caract["shi"] = shi
+	caract["nu"] = nu
 
-	# Pourcentage de noir et blanc 
-	noHist = getHistGreyImage(no)
-	aHist = getHistGreyImage(a)
-	shiHist = getHistGreyImage(shi)
-	tsuHist = getHistGreyImage(tsu)
-	nuHist = getHistGreyImage(nu)
-
-	# Create dictionnary
-	percentTab = {}
-
-	# Put values in a dictionnary
-	percent = noHist[0]/(noHist[0]+noHist[255])*100
-	percentTab["no"] = percent[0]
-	percent = aHist[0]/(aHist[0]+aHist[255])*100
-	percentTab["a"] = percent[0]
-	percent = shiHist[0]/(shiHist[0]+shiHist[255])*100
-	percentTab["shi"] = percent[0]
-	percent = tsuHist[0]/(tsuHist[0]+tsuHist[255])*100
-	percentTab["tsu"] = percent[0]
-	percent = nuHist[0]/(nuHist[0]+nuHist[255])*100
-	percentTab["nu"] = percent[0]
-
-	print ""
-	print "tableau de poucentage de noir : "
-	print percentTab
-	print "on peut dire que si c'est en dessous de 13, c'est shi ou tsu, sinon c'est a, nu ou no"
-	print ""
-
-	# SIFT
-	# compare(no, no2)
+	BDD = []
+	for key, value in caract.iteritems():
+		BDD.append(analyseImage(value, key))
 
 	# Return BDD
-	return 0
-
-# ==============================
-# =========== ANALYSE ==========
-# ==============================
-# Analyse l'image avec toutes les images de la BDD
-def compare(img, BDD):
-
-	# Return yes or no
-	return 0
+	return BDD
 
 # ==============================
 # ======= GET NB IMAGE =========
@@ -148,9 +133,10 @@ def getNBImage(img):
 	return NBimage
 
 # ==============================
-# ====== COMPARE IMAGES ========
+# =========== ANALYSE ==========
 # ==============================
-def compare(img1, img2):
+# Analyse l'image avec toutes les images de la BDD
+def compare(res, BDD):
 	# copyMatrix = no
 	# sift = cv2.xfeatures2d.SIFT_create() 
 	# kp, des = sift.detectAndCompute(no,None)
@@ -162,30 +148,42 @@ def compare(img1, img2):
 	# img2 = cv2.drawKeypoints(no2,kp2, copyMatrix2)
 	# cv2.imwrite('sift_keypoints_no2.jpg',img2)
 
-	# Initiate SIFT detector
-	sift = cv2.xfeatures2d.SIFT_create() 
+	# # Initiate SIFT detector
+	# sift = cv2.xfeatures2d.SIFT_create() 
 
-	# find the keypoints and descriptors with SIFT
-	kp1,des1 = sift.detectAndCompute(img1,None)
-	kp2,des2 = sift.detectAndCompute(img2,None)
+	# # find the keypoints and descriptors with SIFT
+	# kp1,des1 = sift.detectAndCompute(img1,None)
+	# kp2,des2 = sift.detectAndCompute(img2,None)
+
+
 	# FLANN parameters
 	FLANN_INDEX_KDTREE = 1
 	index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
 	search_params = dict(checks=50)   # or pass empty dictionary
 	flann = cv2.FlannBasedMatcher(index_params,search_params)
-	matches = flann.knnMatch(des1,des2,k=2)
-	# Need to draw only good matches, so create a mask
-	matchesMask = [[0,0] for i in xrange(len(matches))]
-	# ratio test as per Lowe's paper
-	for i,(m,n) in enumerate(matches):
-	    if m.distance < 0.7*n.distance:
-	        matchesMask[i]=[1,0]
-	draw_params = dict(matchColor = (0,255,0),
-	                   singlePointColor = (255,0,0),
-	                   matchesMask = matchesMask,
-	                   flags = 0)
-	img3 = cv2.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
-	cv2.imwrite('sift_keypoints_compare.jpg',img3)
+
+	des1 = res[3]
+	kp1 = res[2]
+	img1 = res[4]
+	
+	for element in BDD:
+		des2 = element[3]
+		kp2 = element[2]
+		img2 = element[4]
+
+		matches = flann.knnMatch(des1,des2,k=2)
+		# Need to draw only good matches, so create a mask
+		matchesMask = [[0,0] for i in xrange(len(matches))]
+		# ratio test as per Lowe's paper
+		for i,(m,n) in enumerate(matches):
+		    if m.distance < 0.7*n.distance:
+		        matchesMask[i]=[1,0]
+		draw_params = dict(matchColor = (0,255,0),
+		                   singlePointColor = (255,0,0),
+		                   matchesMask = matchesMask,
+		                   flags = 0)
+		img3 = cv2.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
+		cv2.imwrite("sift_keypoints_compare" + element[0] + res[0] + ".jpg",img3)
 
 
 # Return image opened
