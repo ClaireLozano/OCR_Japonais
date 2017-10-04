@@ -43,6 +43,16 @@ def applicationOfFilter(img, folder):
 	# Save image
 	scipy.misc.imsave('otsu.png', imgBW)
 
+
+	# image = 1
+	# tab = []
+	# width, height = imgBW.shape
+	# for i in range(0, width)
+	# 	for j in range(0, height)
+	# 		if imgBW[i, j] = 0
+	# 			xmin, ymin, xmax, ymax = getXYMinMax(width, height, 0, 0)
+	# 			tab[]
+
 	# plt.hist(img.ravel(),256,[0,256])
 	# plt.show()
 	# plt.imshow(im_med)
