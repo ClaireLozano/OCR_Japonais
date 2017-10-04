@@ -7,13 +7,8 @@ from matplotlib import pyplot as plt
 import imghdr
 from scipy import ndimage
 import scipy.misc
-from astropy.io import fits
-from astropy.utils.data import get_pkg_data_filename
-from astropy.convolution import Gaussian2DKernel
 from scipy.signal import convolve as scipy_convolve
-from astropy.convolution import convolve
 from scipy import signal as sg
-import sift
 from scipy import ndimage as ndi
 from operator import itemgetter
 import imageio
