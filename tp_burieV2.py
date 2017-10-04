@@ -5,7 +5,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 import imghdr
-from scipy import ndimage 
+from scipy import ndimage
 import scipy.misc
 from astropy.io import fits
 from astropy.utils.data import get_pkg_data_filename
@@ -15,6 +15,11 @@ from astropy.convolution import convolve
 from scipy import signal as sg
 import sift
 from scipy import ndimage as ndi
+from operator import itemgetter
+import imageio
+import matplotlib.image as mpimg
+from  matplotlib.pyplot import *
+import random
 
 def applicationOfFilter(img, folder):
 
@@ -24,24 +29,45 @@ def applicationOfFilter(img, folder):
 
 	# Ovrir image 
 	img = openImage(folder, img)
-	no = openImage(folder, "no.png")
-	no2 = openImage(folder, "no2.png")
-	a = openImage(folder, "a.png")
-	shi = openImage(folder, "shi.png")
-	tsu = openImage(folder, "tsu.png")
-	nu = openImage(folder, "nu.png")
-
 	# Image noir et blanc
 	imgBW = getNBImage(img)
-	no = getNBImage(no)
-	no2 = getNBImage(no2)
-	a = getNBImage(a)
-	shi = getNBImage(shi)
-	tsu = getNBImage(tsu)
-	nu = getNBImage(nu)
-
 	# Save image
 	scipy.misc.imsave('otsu.png', imgBW)
+
+	# PATH = "img/a.png"
+	PATH = "otsu.png"
+
+	img = cv2.imread(PATH)
+
+	# Transformation en niveau de gris
+	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+	# Seuillage
+	_,thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+
+	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(2,2))
+
+	# Dillatation
+	dilated = cv2.dilate(thresh,kernel,iterations = 13)
+
+	# Detection des contours
+	val1 = cv2.RETR_EXTERNAL
+	val2 = cv2.CHAIN_APPROX_NONE
+
+	_, contours, _= cv2.findContours(dilated, val1, val2)
+
+	# Pour chaque contour on les redessine sur l'image original
+	for contour in contours:
+	    [x,y,w,h] = cv2.boundingRect(contour)
+
+	    # On supprime les zones trop petites, pour eviter le bruit
+	    # if h<40 or w<40:
+	    #     continue
+	    cv2.rectangle(img,(x-2,y-2),(x+w-12,y+h-12),(0,0,255),1) 
+
+	cv2.imwrite('contoured_1.png', img)
+
+
 
 
 	# image = 1
@@ -59,8 +85,24 @@ def applicationOfFilter(img, folder):
 	# plt.show()
 
 	# ==============================
-	# ========= TRAITEMENT =========
+	# ========== ANALYSE ===========
 	# ==============================
+
+	# Ovrir image 
+	no = openImage(folder, "no.png")
+	no2 = openImage(folder, "no2.png")
+	a = openImage(folder, "a.png")
+	shi = openImage(folder, "shi.png")
+	tsu = openImage(folder, "tsu.png")
+	nu = openImage(folder, "nu.png")
+
+	# Image noir et blanc
+	no = getNBImage(no)
+	no2 = getNBImage(no2)
+	a = getNBImage(a)
+	shi = getNBImage(shi)
+	tsu = getNBImage(tsu)
+	nu = getNBImage(nu)
 
 	# Pourcentage de noir et blanc 
 	noHist = getHistGreyImage(no)

@@ -9,9 +9,6 @@ import matplotlib.image as mpimg
 from  matplotlib.pyplot import *
 import random
 from scipy import ndimage, misc
-from skimage import measure
-from skimage import segmentation
-from skimage import morphology
 
 
 PATH = "otsu.png"
@@ -23,6 +20,7 @@ gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 # Seuillage
 _,thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+cv2.imwrite('coucou.png', thresh)
 
 kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(2,2))
 
