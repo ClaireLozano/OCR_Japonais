@@ -21,30 +21,23 @@ import matplotlib.image as mpimg
 from  matplotlib.pyplot import *
 import random
 
+# ==============================
+# ======= GET CARACTERES =======
+# ==============================
 def applicationOfFilter(img, folder):
+	# Get BDD 
+	bdd = makeBDD()
 
-	# ==============================
-	# ========== OPEN IMG ==========
-	# ==============================
-
-	# Ovrir image 
+	# Ovrir image / mettre en noir et blanc / save
 	img = openImage(folder, img)
-	# Image noir et blanc
 	imgBW = getNBImage(img)
-	# Save image
 	scipy.misc.imsave('otsu.png', imgBW)
 
-	# PATH = "img/a.png"
+	# ouvrir image noir et blanc / transformer en gris / binaire 
 	PATH = "otsu.png"
-
 	img = cv2.imread(PATH)
-
-	# Transformation en niveau de gris
 	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-	# Seuillage
 	_,thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
-
 	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(2,2))
 
 	# Dillatation
@@ -58,35 +51,36 @@ def applicationOfFilter(img, folder):
 
 	# Pour chaque contour on les redessine sur l'image original
 	for contour in contours:
-	    [x,y,w,h] = cv2.boundingRect(contour)
-
-	    # On supprime les zones trop petites, pour eviter le bruit
+		# On supprime les zones trop petites, pour eviter le bruit
 	    # if h<40 or w<40:
 	    #     continue
-	    cv2.rectangle(img,(x-2,y-2),(x+w-12,y+h-12),(0,0,255),1) 
+	    [x,y,w,h] = cv2.boundingRect(contour)
+	    # cv2.rectangle(img,(x-2,y-2),(x+w-12,y+h-12),(0,0,255),1)
 
-	cv2.imwrite('contoured_1.png', img)
+	    # Crop image
 
-
-
-
-	# image = 1
-	# tab = []
-	# width, height = imgBW.shape
-	# for i in range(0, width)
-	# 	for j in range(0, height)
-	# 		if imgBW[i, j] = 0
-	# 			xmin, ymin, xmax, ymax = getXYMinMax(width, height, 0, 0)
-	# 			tab[]
+	    # Analyse image 
+	    resultat = analyseImage(imgCrop) 
 
 	# plt.hist(img.ravel(),256,[0,256])
 	# plt.show()
 	# plt.imshow(im_med)
 	# plt.show()
 
-	# ==============================
-	# ========== ANALYSE ===========
-	# ==============================
+
+# ==============================
+# ========== ANALYSE ===========
+# ==============================
+def analyseImage(imgCrop):
+
+	# Get points d'intéret
+	return 0
+
+
+# ==============================
+# ========== MAKE BDD ==========
+# ==============================
+def makeBDD():
 
 	# Ovrir image 
 	no = openImage(folder, "no.png")
@@ -135,8 +129,21 @@ def applicationOfFilter(img, folder):
 	# SIFT
 	# compare(no, no2)
 
+	# Return BDD
 	return 0
 
+# ==============================
+# =========== ANALYSE ==========
+# ==============================
+# Analyse l'image avec toutes les images de la BDD
+def compare(img, BDD):
+
+	# Return yes or no
+	return 0
+
+# ==============================
+# ======= GET NB IMAGE =========
+# ==============================
 def getNBImage(img):
 	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	# Otsu
@@ -145,6 +152,9 @@ def getNBImage(img):
 	NBimage = np.invert(thresh)
 	return NBimage
 
+# ==============================
+# ====== COMPARE IMAGES ========
+# ==============================
 def compare(img1, img2):
 	# copyMatrix = no
 	# sift = cv2.xfeatures2d.SIFT_create() 
