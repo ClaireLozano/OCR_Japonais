@@ -1,4 +1,5 @@
 # Image Gaussien
+from __future__ import division
 import sys
 import cv2
 import os
@@ -16,15 +17,22 @@ import matplotlib.image as mpimg
 from  matplotlib.pyplot import *
 import random
 
+
 # ==============================
 # ======= GET CARACTERES =======
 # ==============================
 def applicationOfFilter(img, folder):
 	# Get BDD 
 	BDD = makeBDD()
+	BDDNonComplexe = makeBDDNonComplexe()
+	BDDComplexe = makeBDDComplexe()
+
 
 	# Ovrir image / mettre en noir et blanc / save
-	img = openImage(folder, img)
+	# img = openImage(folder, img)
+	# imgBW = getNBImage(img)
+	# scipy.misc.imsave('otsu.png', imgBW)
+	img = openImage("img", "img.jpg")
 	imgBW = getNBImage(img)
 	scipy.misc.imsave('otsu.png', imgBW)
 
@@ -49,6 +57,8 @@ def applicationOfFilter(img, folder):
 	for contour in contours:
 		[x,y,w,h] = cv2.boundingRect(contour)
 		# On supprime les zones trop grandes, pour eviter le bruit
+		if h<15 or w<15:
+			continue
 		if h>300 or w>300:
 			continue
 
@@ -58,11 +68,20 @@ def applicationOfFilter(img, folder):
 		imgCrop = img[y-2:y+h-12, x-2:x+w-12]
 
 		# Analyse image 
-		res = analyseImage(imgCrop, "test" + str(i))
+		res = analyseImage(imgCrop, "test_" + str(i))
 		# scipy.misc.imsave("test" + str(i) + ".png", imgCrop)
 
-		# Compare
-		compare(res, BDD)
+
+		# Compare:
+		# 1 - Compare to the histogram value 
+		if( res[1] < 15):
+			compare(res, BDDNonComplexe)
+		if( res[1] > 15):
+			compare(res, BDDComplexe)
+		
+		# 2 - Compare to all the BDD (all element)
+		# compare(res, BDD)
+		
 		i = i+1
 
 		# plt.hist(img.ravel(),256,[0,256])
@@ -92,7 +111,6 @@ def analyseImage(imgCrop, name):
 	distance.append(kp1)
 	distance.append(des1)
 	distance.append(imgCrop)
-
 	return distance
 
 
@@ -112,6 +130,40 @@ def makeBDD():
 	caract["a"] = a
 	caract["tsu"] = tsu
 	caract["shi"] = shi
+	caract["nu"] = nu
+
+	BDD = []
+	for key, value in caract.iteritems():
+		BDD.append(analyseImage(value, key))
+
+	# Return BDD
+	return BDD
+
+def makeBDDNonComplexe():
+	# Ovrir image 
+	shi = openImage(folder, "shi.png")
+	tsu = openImage(folder, "tsu.png")
+
+	caract = {}
+	caract["tsu"] = tsu
+	caract["shi"] = shi
+
+	BDD = []
+	for key, value in caract.iteritems():
+		BDD.append(analyseImage(value, key))
+
+	# Return BDD
+	return BDD
+
+def makeBDDComplexe():
+	# Ovrir image 
+	no = openImage(folder, "no.png")
+	a = openImage(folder, "a.png")
+	nu = openImage(folder, "nu.png")
+
+	caract = {}
+	caract["no"] = no
+	caract["a"] = a
 	caract["nu"] = nu
 
 	BDD = []
@@ -166,26 +218,89 @@ def compare(res, BDD):
 	kp1 = res[2]
 	img1 = res[4]
 	
+	numbrMatche_a = 0
+	numbrMatche_no = 0
+	numbrMatche_shi = 0
+	numbrMatche_nu = 0
+	numbrMatche_tsu = 0
+
+	numberMatches = 0
+	matchesDictonary = {}
+	tabKey = []     
+	tabValue = []
+	
 	for element in BDD:
 		des2 = element[3]
 		kp2 = element[2]
 		img2 = element[4]
+		nearesstMatche = ''
 
 		matches = flann.knnMatch(des1,des2,k=2)
 		# Need to draw only good matches, so create a mask
 		matchesMask = [[0,0] for i in xrange(len(matches))]
 		# ratio test as per Lowe's paper
 		for i,(m,n) in enumerate(matches):
-		    if m.distance < 0.7*n.distance:
-		        matchesMask[i]=[1,0]
+			matched = 'false'
+			numberMatches += 1
+			if m.distance < 0.7*n.distance:
+			    matchesMask[i]=[1,0]
+			    matched = 'true'
+
+
+			if (matched == 'true' and element[0] == 'a'):
+				numbrMatche_a +=1
+				matchesDictonary['a'] = numbrMatche_a
+			if (matched == 'true' and element[0] == 'no'):
+				numbrMatche_no +=1
+				matchesDictonary['no'] = numbrMatche_no
+			if (matched == 'true' and element[0] == 'shi'):
+				numbrMatche_shi +=1
+				matchesDictonary['shi'] = numbrMatche_shi
+			if (matched == 'true' and element[0] == 'nu'):
+				numbrMatche_nu +=1
+				matchesDictonary['nu'] = numbrMatche_nu
+			if (matched == 'true' and element[0] == 'tsu'):
+				numbrMatche_tsu +=1
+				matchesDictonary['tsu'] = numbrMatche_tsu
+
+			    
+		
 		draw_params = dict(matchColor = (0,255,0),
 		                   singlePointColor = (255,0,0),
 		                   matchesMask = matchesMask,
 		                   flags = 0)
 		img3 = cv2.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
 		cv2.imwrite("sift_keypoints_compare" + element[0] + res[0] + ".jpg",img3)
+	
+	for key, value in sorted(matchesDictonary.iteritems(), key=lambda (k,v): (v,k)):
+        #print "%s: %s" % (key, value)
+		tabKey.append(key)
+		tabValue.append(value)
+	
+	recognizedElement = list(reversed(tabKey))	
+	recognizationValue = list(reversed(tabValue))	
+	
+	print "-------"
+	print matchesDictonary	
+	# print (" Nombre de matches",numberMatches)
+	# print recognizedElement[0]
+	# print recognizationValue[0]
+	# print numberMatches
+	# print res[0]
+	if ( numberMatches == 0):
+		return 0
+	else:
+		percentReconize(recognizedElement[0], recognizationValue[0], numberMatches, res[0])
+	print "-------"
 
 
+def percentReconize(recognizedElement, recognizationValue, numberMatches, currentImge):
+	recognizationPercent = recognizationValue / numberMatches
+	recognizationPercent =  "{:.1%}".format(recognizationPercent)
+
+	# currentImage est res[0], nom de l'imgae a tester
+	if(recognizationPercent > "{:.1%}".format(0.15)):
+		print (currentImge, " is : ", recognizedElement, " with dnumber of matche :", numberMatches,recognizationPercent )
 # Return image opened
 def openImage(folder,filename):
 	return cv2.imread(os.path.join(folder,filename))
