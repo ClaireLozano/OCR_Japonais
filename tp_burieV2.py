@@ -5,126 +5,103 @@ import cv2
 import os
 import numpy as np
 from matplotlib import pyplot as plt
-import imghdr
 from scipy import ndimage
 import scipy.misc
 from scipy.signal import convolve as scipy_convolve
-from scipy import signal as sg
-from scipy import ndimage as ndi
-from operator import itemgetter
-import imageio
-import matplotlib.image as mpimg
 from  matplotlib.pyplot import *
-import random
 
-
-# ==============================
-# ======= GET CARACTERES =======
-# ==============================
-def applicationOfFilter(img, folder):
+def findCaractere(img, folder):
 	# Get BDD 
-	BDD = makeBDD()
-	BDDNonComplexe = makeBDDNonComplexe()
-	BDDComplexe = makeBDDComplexe()
+	BDDNonComplexe, BDDComplexe = makeBDD()
 
+	# Nettoyer dossier analyse
+	EraseFile(folder + "/analyse")
 
 	# Ovrir image / mettre en noir et blanc / save
-	# img = openImage(folder, img)
-	# imgBW = getNBImage(img)
-	# scipy.misc.imsave('otsu.png', imgBW)
-	img = openImage("img", "img.jpg")
+	img = openImage(folder, img)
 	imgBW = getNBImage(img)
-	scipy.misc.imsave('otsu.png', imgBW)
-
-	# ouvrir image noir et blanc / transformer en gris / binaire 
-	PATH = "otsu.png"
-	img = cv2.imread(PATH)
-	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	_,thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
-	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(2,2))
+	scipy.misc.imsave(folder + '/otsu.png', imgBW)
 
 	# Dillatation
-	dilated = cv2.dilate(thresh,kernel,iterations = 13)
+	imgBW = np.invert(imgBW)
+	kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(2,2))
+	dilated = cv2.dilate(imgBW,kernel,iterations = 13)
 
 	# Detection des contours
 	val1 = cv2.RETR_EXTERNAL
 	val2 = cv2.CHAIN_APPROX_NONE
-
 	_, contours, _= cv2.findContours(dilated, val1, val2)
 
+	# index 
 	i = 0
-	# Pour chaque contour on les redessine sur l'image original
+	# Pour chaque caracteres detecte, on crop l'image avant de l'analyser et la comparer
 	for contour in contours:
 		[x,y,w,h] = cv2.boundingRect(contour)
-		# On supprime les zones trop grandes, pour eviter le bruit
-		if h<15 or w<15:
-			continue
-		if h>300 or w>300:
+		# On supprime les zones trop grandes ou trop petite, pour eviter le bruit
+		if h<30 or w<30:
 			continue
 
+		# Dessiner les rectangles
 	    # cv2.rectangle(img,(x-2,y-2),(x+w-12,y+h-12),(0,0,255),1)
 
 	    # Crop image
 		imgCrop = img[y-2:y+h-12, x-2:x+w-12]
 
-		# Analyse image 
-		res = analyseImage(imgCrop, "test_" + str(i))
-		# scipy.misc.imsave("test" + str(i) + ".png", imgCrop)
 
+		res = analyseImage(imgCrop, "caractereDetecte_" + str(i))
+		scipy.misc.imsave(folder + "/analyse/caractereDetecte_" + str(i) + ".png", imgCrop)
 
-		# Compare:
-		# 1 - Compare to the histogram value 
+		# Comparer le pourcentage de pixel noir pour les classifier
+		# Ces valeurs sont choisit arbitrairement
 		if( res[1] < 15):
+			# Si pas beaucoup de pixel, alors le caractere et soit un "tsu" soit un "shi"
 			compare(res, BDDNonComplexe)
+
 		if( res[1] > 15):
+			# Sinon c'est un "a", "no" ou "nu"
 			compare(res, BDDComplexe)
 		
-		# 2 - Compare to all the BDD (all element)
+		# Solution que l'on avait utilise au debut : comparaison de l'element avec tout les element de la base de donnees
 		# compare(res, BDD)
-		
+			
 		i = i+1
 
-		# plt.hist(img.ravel(),256,[0,256])
-		# plt.show()
-		# plt.imshow(im_med)
-		# plt.show()
 
-
-# ==============================
-# ========== ANALYSE ===========
-# ==============================
+# Analyse d'une image
 def analyseImage(imgCrop, name):
 	# Get pourcentage noir et blanc
 	imgNB = getNBImage(imgCrop)
 	hist = getHistGreyImage(imgNB)
 	percent = hist[0]/(hist[0]+hist[255])*100
 
-	# Initiate SIFT detector
-	sift = cv2.xfeatures2d.SIFT_create() 
-
+	# Initiate SURF detector
+	# sift = cv2.xfeatures2d.SIFT_create() 
+	surf = cv2.xfeatures2d.SURF_create()
 	# find the keypoints and descriptors with SIFT
-	kp1,des1 = sift.detectAndCompute(imgCrop,None)
+	# kp1,des1 = sift.detectAndCompute(imgCrop,None)
+	kp1,des1 = surf.detectAndCompute(imgCrop,None)
 
+	# Ajout du nom de l'image, pourcentage de pixel noir, point d'interet, descripteur, image
 	distance = []
 	distance.append(name)
 	distance.append(percent[0])
 	distance.append(kp1)
 	distance.append(des1)
 	distance.append(imgCrop)
+
 	return distance
 
 
-# ==============================
-# ========== MAKE BDD ==========
-# ==============================
+# Creation de la base de donnees 
 def makeBDD():
-	# Ovrir image 
+	# Ovrir les images 
 	no = openImage(folder, "no.png")
 	a = openImage(folder, "a.png")
 	shi = openImage(folder, "shi.png")
 	tsu = openImage(folder, "tsu.png")
 	nu = openImage(folder, "nu.png")
 
+	# Creation du dictionnaire
 	caract = {}
 	caract["no"] = no
 	caract["a"] = a
@@ -132,92 +109,34 @@ def makeBDD():
 	caract["shi"] = shi
 	caract["nu"] = nu
 
-	BDD = []
+	# Creation des array qui representeront les bases de donnees
+	BDDNonComplexe = []
+	BDDComplexe = []
+
 	for key, value in caract.iteritems():
-		BDD.append(analyseImage(value, key))
+		analyse = analyseImage(value, key)
+		if (analyse[1] < 15):
+			BDDNonComplexe.append(analyseImage(value, key))
+		else:
+			BDDComplexe.append(analyseImage(value, key))
 
-	# Return BDD
-	return BDD
+	return BDDNonComplexe, BDDComplexe
 
-def makeBDDNonComplexe():
-	# Ovrir image 
-	shi = openImage(folder, "shi.png")
-	tsu = openImage(folder, "tsu.png")
 
-	caract = {}
-	caract["tsu"] = tsu
-	caract["shi"] = shi
-
-	BDD = []
-	for key, value in caract.iteritems():
-		BDD.append(analyseImage(value, key))
-
-	# Return BDD
-	return BDD
-
-def makeBDDComplexe():
-	# Ovrir image 
-	no = openImage(folder, "no.png")
-	a = openImage(folder, "a.png")
-	nu = openImage(folder, "nu.png")
-
-	caract = {}
-	caract["no"] = no
-	caract["a"] = a
-	caract["nu"] = nu
-
-	BDD = []
-	for key, value in caract.iteritems():
-		BDD.append(analyseImage(value, key))
-
-	# Return BDD
-	return BDD
-
-# ==============================
-# ======= GET NB IMAGE =========
-# ==============================
-def getNBImage(img):
-	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	# Otsu
-	img = img.astype(np.uint8)
-	ret, thresh = cv2.threshold(img,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
-	NBimage = np.invert(thresh)
-	return NBimage
-
-# ==============================
-# =========== ANALYSE ==========
-# ==============================
 # Analyse l'image avec toutes les images de la BDD
 def compare(res, BDD):
-	# copyMatrix = no
-	# sift = cv2.xfeatures2d.SIFT_create() 
-	# kp, des = sift.detectAndCompute(no,None)
-	# img = cv2.drawKeypoints(no,kp, copyMatrix)
-	# cv2.imwrite('sift_keypoints_no.jpg',img)
-
-	# copyMatrix2 = no2
-	# kp2, des2 = sift.detectAndCompute(no2,None)
-	# img2 = cv2.drawKeypoints(no2,kp2, copyMatrix2)
-	# cv2.imwrite('sift_keypoints_no2.jpg',img2)
-
-	# # Initiate SIFT detector
-	# sift = cv2.xfeatures2d.SIFT_create() 
-
-	# # find the keypoints and descriptors with SIFT
-	# kp1,des1 = sift.detectAndCompute(img1,None)
-	# kp2,des2 = sift.detectAndCompute(img2,None)
-
-
 	# FLANN parameters
 	FLANN_INDEX_KDTREE = 1
 	index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
 	search_params = dict(checks=50)   # or pass empty dictionary
 	flann = cv2.FlannBasedMatcher(index_params,search_params)
 
+	# Recuperation des caracteristiques de l'image a analyser
 	des1 = res[3]
 	kp1 = res[2]
 	img1 = res[4]
 	
+	# Initialisation des nombres de match pour chaque caratere de la bdd
 	numbrMatche_a = 0
 	numbrMatche_no = 0
 	numbrMatche_shi = 0
@@ -230,11 +149,14 @@ def compare(res, BDD):
 	tabValue = []
 	
 	for element in BDD:
+		# Recuperation des caracteristiques des images comprise dans la base de donnees
 		des2 = element[3]
 		kp2 = element[2]
 		img2 = element[4]
+
 		nearesstMatche = ''
 
+		# Analyse des distances grace a la methode flann
 		matches = flann.knnMatch(des1,des2,k=2)
 		# Need to draw only good matches, so create a mask
 		matchesMask = [[0,0] for i in xrange(len(matches))]
@@ -245,7 +167,6 @@ def compare(res, BDD):
 			if m.distance < 0.7*n.distance:
 			    matchesMask[i]=[1,0]
 			    matched = 'true'
-
 
 			if (matched == 'true' and element[0] == 'a'):
 				numbrMatche_a +=1
@@ -262,63 +183,77 @@ def compare(res, BDD):
 			if (matched == 'true' and element[0] == 'tsu'):
 				numbrMatche_tsu +=1
 				matchesDictonary['tsu'] = numbrMatche_tsu
-
-			    
 		
 		draw_params = dict(matchColor = (0,255,0),
 		                   singlePointColor = (255,0,0),
 		                   matchesMask = matchesMask,
 		                   flags = 0)
 		img3 = cv2.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
-		cv2.imwrite("sift_keypoints_compare" + element[0] + res[0] + ".jpg",img3)
+		cv2.imwrite(folder + "/analyse/sift_keypoints_compare" + element[0] + res[0] + ".jpg",img3)
 	
 	for key, value in sorted(matchesDictonary.iteritems(), key=lambda (k,v): (v,k)):
-        #print "%s: %s" % (key, value)
 		tabKey.append(key)
 		tabValue.append(value)
 	
 	recognizedElement = list(reversed(tabKey))	
 	recognizationValue = list(reversed(tabValue))	
-	
-	print "-------"
-	print matchesDictonary	
-	# print (" Nombre de matches",numberMatches)
-	# print recognizedElement[0]
-	# print recognizationValue[0]
-	# print numberMatches
-	# print res[0]
-	if ( numberMatches == 0):
-		return 0
-	else:
-		percentReconize(recognizedElement[0], recognizationValue[0], numberMatches, res[0])
-	print "-------"
+
+	if recognizationValue and recognizedElement:
+		# Si il n'y a pas de match entre les points, ne pas le prendre en compte
+		if (numberMatches == 0):
+			return 0
+		else:
+			percentReconize(recognizedElement[0], recognizationValue[0], numberMatches, res[0])
+	print ""
 
 
+# Afficher le resultat de la comparaison de caractere
 def percentReconize(recognizedElement, recognizationValue, numberMatches, currentImge):
 	recognizationPercent = recognizationValue / numberMatches
-	recognizationPercent =  "{:.1%}".format(recognizationPercent)
 
+	print ""
 	# currentImage est res[0], nom de l'imgae a tester
-	if(recognizationPercent > "{:.1%}".format(0.15)):
-		print (currentImge, " is : ", recognizedElement, " with dnumber of matche :", numberMatches,recognizationPercent )
-# Return image opened
+	if(recognizationPercent > 0.05):
+		recognizationPercent =  "{:.1%}".format(recognizationPercent)
+		print "Un caractere a ete detecte et reconnu :"
+		print "    l'image", currentImge, "a ete reconnu comme etant un '", recognizedElement, "' avec", recognizationValue, "sur", numberMatches, "match et donc", recognizationPercent, "de reconnaissance (l'image a ete enregistrer dans le dossier img/analyse)." 
+	else:
+		recognizationPercent =  "{:.1%}".format(recognizationPercent)
+		print "Un caractere a ete detecte mais pas reconnu :"
+		print "    l'image", currentImge, "n'a pas ete reconnu mais le caractere '", recognizedElement, "' semble etre le plus proche avec", recognizationValue, "sur", numberMatches, "match et donc", recognizationPercent, "de reconnaissance (l'image a ete enregistrer dans le dossier img/analyse)." 
+
+
+# Retourne une image binariser - methode utilisee : Otsu
+def getNBImage(img):
+	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+	img = img.astype(np.uint8)
+	ret, thresh = cv2.threshold(img,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+	NBimage = np.invert(thresh)
+	return NBimage
+
+
+# Retourne image ouverte
 def openImage(folder,filename):
 	return cv2.imread(os.path.join(folder,filename))
 
-# Return the 3 histogram RGB
-def getHistColorImage(img):
-	histBlue = cv2.calcHist([img],[0],None,[16],[0,256])
-	histGreen = cv2.calcHist([img],[1],None,[16],[0,256])
-	histRed = cv2.calcHist([img],[2],None,[16],[0,256])
-	return [histBlue, histGreen, histRed]
 
-# Return the 3 histogram RGB
+# Retourne histogram de niveau de gris 
 def getHistGreyImage(img):
 	hist = cv2.calcHist([img],[0],None,[256],[0,256])
 	return hist
 
 
-# Line : python tp_burie.py img.jpg
+# Supprime le contenue du dossier analyse
+def EraseFile(folder):
+	files=os.listdir(folder)
+	for i in range(0,len(files)):
+		os.remove(folder+'/'+files[i])
+
+
+# Line : python tp_burieV2.py img.jpg img
+
+# Image qui sera analysee
 img = str(sys.argv[1])
+# Localisation du dossier
 folder = str(sys.argv[2])
-applicationOfFilter(img, folder)
+findCaractere(img, folder)
