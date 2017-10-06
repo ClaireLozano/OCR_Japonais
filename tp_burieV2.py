@@ -1,4 +1,3 @@
-# Image Gaussien
 from __future__ import division
 import sys
 import cv2
